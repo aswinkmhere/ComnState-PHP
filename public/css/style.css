@@ -9,3 +9,25 @@
     cursor: pointer;
     margin-bottom: 20px;
 }
+/* modal root must be fixed and on top of Leaflet panes */
+#issueModal {
+  position: fixed !important;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 2147483647 !important; /* VERY high */
+  pointer-events: auto;
+}
+
+/* the dialog itself */
+#issueModal .modal-content {
+  position: relative;
+  z-index: 2147483648 !important;
+  background: #fff;
+  padding: 18px;
+  width: 320px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}

@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['points'])) {
         $_POST['name'],
         $_POST['type'],
         $_POST['status'],
-        date("Y-m-d H:i"), // default save time
+        date("Y-m-d H:i"),
         json_encode($decoded),
         $issues
     ]);
@@ -70,6 +70,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_id'])) {
     }
 }
 
+// Save reported issue
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['report_issue'])) {
+    $routeId = $_POST['route_id'] ?: null;
+    $issueDate = $_POST['issue_date'];
+    $issueTime = $_POST['issue_time'];
+    $latlng = $_POST['latlng'];
+
+    $fullTime = $issueDate . " " . $issueTime;
+
+    if ($routeId) {
+        $route = $db->query("SELECT issues FROM routes WHERE id=".(int)$routeId)->fetch(PDO::FETCH_ASSOC);
+        $currentIssues = $route && $route['issues'] ? json_decode($route['issues'], true) : [];
+    } else {
+        $currentIssues = [];
+    }
+
+    $currentIssues[] = ["latlng" => $latlng, "time" => $fullTime];
+
+    if ($routeId) {
+        $stmt = $db->prepare("UPDATE routes SET issues=? WHERE id=?");
+        $stmt->execute([json_encode($currentIssues), $routeId]);
+    }
+}
+
 $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -77,12 +101,23 @@ $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO
 <head>
   <title>Dashboard - <?php echo htmlspecialchars($user); ?></title>
   <link rel="stylesheet" href="leaflet/leaflet.css"/>
+  <link rel="stylesheet" href="css/style.css"/>
   <style>
     #map {height:600px;width:100%;}
     #controls {margin:10px 0;}
     textarea {width:100%; height:60px;}
     #routeList {margin-top:20px;}
     #routeList li {margin:5px 0;}
+    #issueModal {
+      display:none;
+      position:fixed;
+      top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.6);
+      justify-content:center;align-items:center;
+    }
+    #issueModal .modal-content {
+      background:#fff;padding:20px;border-radius:8px;width:300px;
+    }
   </style>
 </head>
 <body>
@@ -102,14 +137,31 @@ $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO
     </select>
     <input type="hidden" name="issues" id="issues">
     <button type="submit">Save Route</button>
-    <button type="button" onclick="undoLastPoint()">Undo Last Point</button>
-    <button type="button" onclick="undoLastIssue()">Undo Last Issue</button>
   </form>
 
   <div id="map"></div>
 
   <h3>Your Routes</h3>
   <ul id="routeList"></ul>
+
+  <!-- Issue Modal -->
+  <div id="issueModal">
+    <div class="modal-content">
+      <h3>Report Issue</h3>
+      <form method="post">
+        <input type="hidden" name="report_issue" value="1">
+        <input type="hidden" name="route_id" id="modalRouteId">
+        <label>Date:</label>
+        <input type="date" name="issue_date" id="issueDate" required><br>
+        <label>Time:</label>
+        <input type="time" name="issue_time" id="issueTime" required><br>
+        <label>Location:</label>
+        <input type="text" name="latlng" id="issueLatLng" placeholder="lat,lng"><br><br>
+        <button type="submit">Save Issue</button>
+        <button type="button" onclick="closeIssueModal()">Cancel</button>
+      </form>
+    </div>
+  </div>
 
   <script src="leaflet/leaflet.js"></script>
   <script>
@@ -120,74 +172,14 @@ $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO
 
     var drawnPoints = [];
     var tempLine = null;
-    var issueMarkers = [];
 
-    // Keyboard: Backspace = undo route point
-    document.addEventListener('keydown', function(e) {
-        let active = document.activeElement;
-        if (e.key === "Backspace" && active.tagName !== "INPUT" && active.tagName !== "TEXTAREA") {
-            e.preventDefault();
-            undoLastPoint();
-        }
-    });
-
-    // Add points or issues
+    // Map click opens issue modal
     map.on('click', function(e) {
-        let status = document.querySelector("select[name='status']").value;
-
-        if (status === "defunct") {
-            let issueTime = prompt("Enter time for this issue point (YYYY-MM-DD HH:MM):");
-            if (!issueTime) return;
-
-            let idx = issueMarkers.length;
-            let marker = L.circleMarker(e.latlng, {color: "red", radius: 6}).addTo(map);
-            marker.bindPopup(`Issue<br>${issueTime}<br><button onclick="deleteIssue(${idx})">Delete</button>`);
-            issueMarkers.push(marker);
-
-            let currentIssues = JSON.parse(document.getElementById('issues').value || "[]");
-            currentIssues.push({lat: e.latlng.lat, lng: e.latlng.lng, time: issueTime});
-            document.getElementById('issues').value = JSON.stringify(currentIssues);
-        } else {
-            let latlng = [e.latlng.lat, e.latlng.lng];
-            drawnPoints.push(latlng);
-            if (tempLine) map.removeLayer(tempLine);
-            tempLine = L.polyline(drawnPoints, {color: 'blue', weight: 2}).addTo(map);
-            document.getElementById('points').value = JSON.stringify(drawnPoints);
-        }
+      let lat = e.latlng.lat.toFixed(4);
+      let lng = e.latlng.lng.toFixed(4);
+      openIssueModal(null, {lat: lat, lng: lng});
     });
 
-    function undoLastPoint() {
-      if (drawnPoints.length > 0) {
-        drawnPoints.pop();
-        if (tempLine) map.removeLayer(tempLine);
-        if (drawnPoints.length > 0) {
-          tempLine = L.polyline(drawnPoints, {color: 'blue', weight: 2}).addTo(map);
-        }
-        document.getElementById('points').value = JSON.stringify(drawnPoints);
-      }
-    }
-
-    function undoLastIssue() {
-        let currentIssues = JSON.parse(document.getElementById('issues').value || "[]");
-        if (issueMarkers.length > 0) {
-            let lastMarker = issueMarkers.pop();
-            map.removeLayer(lastMarker);
-            currentIssues.pop();
-            document.getElementById('issues').value = JSON.stringify(currentIssues);
-        }
-    }
-
-    function deleteIssue(index) {
-        let currentIssues = JSON.parse(document.getElementById('issues').value || "[]");
-        if (issueMarkers[index]) {
-            map.removeLayer(issueMarkers[index]);
-            issueMarkers[index] = null;
-            currentIssues.splice(index,1);
-            document.getElementById('issues').value = JSON.stringify(currentIssues);
-        }
-    }
-
-    // Draw existing routes
     var routes = <?php echo json_encode($routes); ?>;
     routes.forEach(r => {
       try {
@@ -198,26 +190,98 @@ $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO
           .bindPopup("Route: " + r.name + "<br>Status: " + r.status + "<br>Last time: " + (r.last_status_time || ""))
           .addTo(map);
 
-        // Show issues
         if (r.issues) {
           let issuePoints = JSON.parse(r.issues);
-          issuePoints.forEach((pt, idx) => {
-            L.circleMarker([pt.lat, pt.lng], {color: "red"}).bindPopup("Issue<br>"+pt.time).addTo(map);
+          issuePoints.forEach(pt => {
+            L.circleMarker(pt.latlng.split(',').map(Number), {color: "red"}).bindPopup("Issue<br>"+pt.time).addTo(map);
           });
         }
 
-        // Add to list
         let li = document.createElement("li");
         li.innerHTML = r.name + " (" + r.status + ") " +
-        `<button type="button" onclick='editRoute(${JSON.stringify(r)})'>Edit</button>` +
-        `<form method="post" style="display:inline;" onsubmit="return confirmToggle(this)">
+          `<form method="post" style="display:inline;" onsubmit="return confirmToggle(this)">
             <input type="hidden" name="toggle_id" value="${r.id}">
             <button type="submit">Toggle Status</button>
-        </form>` +
-        (r.status === "defunct" ? `<button type="button" onclick='markIssues(${JSON.stringify(r)})'>Mark Issues</button>` : "");
+          </form>
+          <button type="button" onclick='openIssueModal(${r.id}, null)'>Report Issue</button>`;
         document.getElementById("routeList").appendChild(li);
-
       } catch(e) { console.error("Bad coordinates:", r.coordinates); }
+    });
+
+
+    
+    // ensure modal is appended to document.body (avoid being inside any Leaflet pane/stacking context)
+    document.addEventListener('DOMContentLoaded', function() {
+      const modal = document.getElementById('issueModal');
+      if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+    });
+
+    // helper to disable / enable Leaflet interactions
+    function disableMapInteraction(map) {
+      if (!map) return;
+      try { map.dragging.disable(); } catch(e) {}
+      try { map.doubleClickZoom.disable(); } catch(e) {}
+      try { map.scrollWheelZoom.disable(); } catch(e) {}
+      try { map.boxZoom.disable(); } catch(e) {}
+      try { map.keyboard.disable(); } catch(e) {}
+      // if you have map.off('click',someHandler) logic you may want to keep click but usually okay
+    }
+    function enableMapInteraction(map) {
+      if (!map) return;
+      try { map.dragging.enable(); } catch(e) {}
+      try { map.doubleClickZoom.enable(); } catch(e) {}
+      try { map.scrollWheelZoom.enable(); } catch(e) {}
+      try { map.boxZoom.enable(); } catch(e) {}
+      try { map.keyboard.enable(); } catch(e) {}
+    }
+
+    // update your open/close modal functions to ensure modal is on top and map is disabled
+    function openIssueModal(routeId=null, latlng=null) {
+      // ensure it's attached to body (extra safety)
+      const modal = document.getElementById('issueModal');
+      if (modal && modal.parentElement !== document.body) document.body.appendChild(modal);
+
+      // fill default date/time as before
+      document.getElementById('modalRouteId').value = routeId || "";
+      document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
+      let now = new Date();
+      document.getElementById('issueTime').value =
+        String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
+
+      if (latlng) {
+        document.getElementById('issueLatLng').value = `${latlng.lat},${latlng.lng}`;
+      }
+
+      // show modal and ensure it overlays everything
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+
+      // disable map interactions so user doesn't drag/zoom the map while modal is open
+      if (typeof map !== 'undefined') disableMapInteraction(map);
+    }
+
+    function closeIssueModal() {
+      const modal = document.getElementById('issueModal');
+      if (!modal) return;
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+
+      // re-enable map interactions
+      if (typeof map !== 'undefined') enableMapInteraction(map);
+    }
+
+    // If you also open modal from route-list button without latlng, call openIssueModal(routeId, null).
+    // If you do a map click handler that calls openIssueModal(null, e.latlng) that will auto-fill coords.
+
+    // If using keyboard / ESC key to close modal:
+    document.addEventListener('keydown', function(e) {
+      const modal = document.getElementById('issueModal');
+      if (!modal) return;
+      if (modal.style.display === 'flex' && e.key === 'Escape') {
+        closeIssueModal();
+      }
     });
 
     function confirmToggle(form) {
@@ -231,44 +295,21 @@ $routes = $db->query("SELECT * FROM routes WHERE user_id='$user'")->fetchAll(PDO
         return true;
     }
 
-    function editRoute(route) {
-      drawnPoints = JSON.parse(route.coordinates);
-      if (tempLine) map.removeLayer(tempLine);
-      tempLine = L.polyline(drawnPoints, {color: 'blue', weight: 2}).addTo(map);
-      document.getElementById('points').value = JSON.stringify(drawnPoints);
-      document.querySelector("input[name='name']").value = route.name;
-      document.querySelector("select[name='type']").value = route.type;
-      document.querySelector("select[name='status']").value = route.status;
+    function openIssueModal(routeId=null, latlng=null) {
+      document.getElementById('modalRouteId').value = routeId || "";
 
-      // reset issues
-      issueMarkers.forEach(m => { if (m) map.removeLayer(m); });
-      issueMarkers = [];
-      document.getElementById('issues').value = route.issues || "[]";
-      if (route.issues) {
-        JSON.parse(route.issues).forEach(pt => {
-          let marker = L.circleMarker([pt.lat, pt.lng], {color: "red"}).addTo(map);
-          issueMarkers.push(marker);
-        });
-      }
+      document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
+      let now = new Date();
+      let hh = String(now.getHours()).padStart(2,'0');
+      let mm = String(now.getMinutes()).padStart(2,'0');
+      document.getElementById('issueTime').value = `${hh}:${mm}`;
+
+      document.getElementById('issueLatLng').value = latlng ? `${latlng.lat},${latlng.lng}` : "";
+      document.getElementById('issueModal').style.display = "flex";
     }
 
-    function markIssues(route) {
-        issueMarkers.forEach(m => { if (m) map.removeLayer(m); });
-        issueMarkers = [];
-        let issues = [];
-        if (route.issues) {
-            issues = JSON.parse(route.issues);
-            issues.forEach(pt => {
-                let marker = L.circleMarker([pt.lat, pt.lng], {color: "red"}).addTo(map);
-                issueMarkers.push(marker);
-            });
-        }
-        document.querySelector("input[name='name']").value = route.name;
-        document.querySelector("select[name='status']").value = "defunct";
-        document.querySelector("select[name='type']").value = route.type;
-        document.getElementById('points').value = route.coordinates;
-        document.getElementById('issues').value = JSON.stringify(issues);
-        alert("Click on the map to add issue spots for " + route.name);
+    function closeIssueModal() {
+      document.getElementById('issueModal').style.display = "none";
     }
   </script>
 </body>
