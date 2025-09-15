@@ -16,5 +16,13 @@ CREATE TABLE routes (
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS unique_user_route 
-           ON routes(user_id, name);
+CREATE TABLE IF NOT EXISTS issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id INTEGER,
+    user TEXT,
+    lat REAL,
+    lng REAL,
+    description TEXT,
+    time_reported TEXT,
+    FOREIGN KEY(route_id) REFERENCES routes(id)
+);
