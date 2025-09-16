@@ -137,6 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_id'])) {
     $status_date = $_POST['status_date'] ?? '0000-00-00';
     $status_time = $_POST['status_time'] ?? '00:00';
     $full_status_time = $status_date . ' ' . $status_time;
+    
 
     $routeStmt = $db->prepare("SELECT status FROM routes WHERE id = ?");
     $routeStmt->execute([$id]);
@@ -160,122 +161,143 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
   <title>Dashboard - <?php echo htmlspecialchars($user); ?></title>
   <link rel="stylesheet" href="leaflet/leaflet.css"/>
+  <link rel="stylesheet" href="css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="css/style.css"/>
   <style>
-    body { font-family: sans-serif; }
-    #map { height: 600px; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
-    #routeList { margin-top: 20px; padding-left: 20px; }
-    #routeList li { margin: 8px 0; }
-    #issueModal, #toggleModal {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 10000;
-    }
-    .modal-content {
-      background: #fff; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    }
-    .modal-content h3 { margin-top: 0; }
-    .modal-content label { display: block; margin-top: 10px; margin-bottom: 5px; font-weight: bold; }
-    .modal-content input, .modal-content textarea, .modal-content button { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
-    .modal-content textarea { resize: vertical; min-height: 80px; }
-    .modal-content .button-group { display: flex; gap: 10px; }
-    .issue-delete-btn {
-        background-color: #dc3545; /* Red color */
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-top: 5px;
-        width: auto; /* Override modal-content button width */
-    }
-    .issue-delete-btn:hover {
-        background-color: #c82333;
-    }
+   
   </style>
 </head>
 <body>
-  <h2>Welcome <?php echo htmlspecialchars($user); ?></h2>
-  <a href="logout.php">Logout</a>
-
-  <hr>
-
-  <h3>Create New Route</h3>
-  <form id="routeForm" method="post">
-    <input type="text" name="name" placeholder="Route Name" required><br>
-    <textarea name="points" id="points" placeholder='Click on map in "Draw Route" mode to add points' readonly></textarea><br>
-    <select name="type">
-      <option value="single">Single</option>
-      <option value="double">Double</option>
-    </select>
-    <select name="status">
-      <option value="functional">Functional</option>
-      <option value="defunct">Defunct</option>
-    </select>
-    <button type="submit">Save Route</button>
-  </form>
-
-  <hr>
-
-  <h3>Map Control</h3>
-  <div style="margin:10px 0;">
-    <button type="button" onclick="setMode('draw')">Draw Route</button>
-    <button type="button" onclick="setMode('issue')">Report Issue</button>
-    <button type="button" onclick="undoLastPoint()">Undo Last Point</button>
-    <span id="modeIndicator" style="margin-left: 20px; font-style: italic;">Current Mode: Draw</span>
-  </div>
-
-  <div id="map"></div>
-
-  <h3>Your Routes</h3>
-  <ul id="routeList"></ul>
-
-  <div id="issueModal">
-    <div class="modal-content">
-      <h3>Report an Issue</h3>
-      <form id="issueForm">
-        <input type="hidden" name="ajax_issue" value="1">
-        <input type="hidden" name="route_id" id="modalRouteId">
-        
-        <label for="issueDescription">Description:</label>
-        <textarea name="description" id="issueDescription" placeholder="Describe the issue..." required></textarea>
-        
-        <label for="issueDate">Date:</label>
-        <input type="date" name="issue_date" id="issueDate" required>
-        
-        <label for="issueTime">Time:</label>
-        <input type="time" name="issue_time" id="issueTime" required>
-        
-        <label for="issueLatLng">Location (Lat, Lng):</label>
-        <input type="text" name="latlng" id="issueLatLng" required>
-        
-        <div class="button-group">
-          <button type="submit">Save Issue</button>
-          <button type="button" onclick="closeIssueModal()">Cancel</button>
-        </div>
-      </form>
+  <section>
+    <div class="col-md-12 f-left">
+      <h2>Dashboard : <?php echo htmlspecialchars($user); ?></h2>
+      <a href="logout.php">Logout</a>
     </div>
-  </div>
 
-  <div id="toggleModal">
-    <div class="modal-content">
-      <h3>Change Route Status</h3>
-      <form id="toggleForm" method="post">
-        <input type="hidden" name="toggle_id" id="toggleId">
-        
-        <label for="toggleDate">Date of Change:</label>
-        <input type="date" name="status_date" id="toggleDate" required>
-        
-        <label for="toggleTime">Time of Change:</label>
-        <input type="time" name="status_time" id="toggleTime" required>
-        
-        <div class="button-group">
-          <button type="submit">Confirm</button>
-          <button type="button" onclick="closeToggleModal()">Cancel</button>
+
+    <div class="col-md-12 f-left">
+ 
+      <!-- LEFT PORTION -->
+      <div class="col-md-3 f-left">
+
+        <div class="col-md-12 f-left">
+          <div class="d-card ">
+            <h3>Create New Route</h3>
+            <form id="routeForm" method="post">
+              
+              <input type="text" class="form-control form-control-sm" name="name" placeholder="Route Name" required>
+
+              <div class="space"></div>
+
+              <textarea class="form-control form-control-sm" name="points" id="points" placeholder='Click on map in "Draw Route" mode to add points' ></textarea><br>
+              
+              <label for="type" >Route Type:</label>
+              <select name="type" class="form-control form-control-sm">
+                <option value="single">Single</option>
+                <option value="double">Double</option>
+              </select>
+              
+              <div class="space"></div>
+              
+              <label for="status" >Func:</label>
+              <select name="status" class="form-control form-control-sm">
+                <option value="functional">Functional</option>
+                <option value="defunct">Defunct</option>
+              </select>
+              
+              <div class="space"></div>
+              
+              <button type="submit" class="btn btn-primary align-centre">Save Route</button>
+
+            </form>
+          </div>
         </div>
-      </form>
-    </div>
-  </div>
+        
+        <div class="col-md-12 f-left">
+          <div class="d-card">
+            <h3>Map Control</h3>
+            <div class="btn-container">
+              <button class="btn btn-warning" type="button" onclick="setMode('draw')">Draw Route</button>
+              <button class="btn btn-danger" type="button" onclick="setMode('issue')">Report Issue</button>
+              <button class="btn btn-info" type="button" onclick="undoLastPoint()">Undo Last Point</button>
+              
+              <span id="modeIndicator" style="margin: auto; text-align:center; font-style: italic;">Current Mode: Draw</span>
+            </div>
+            
+          </div>
 
+          <div class="d-card">
+            <ul id="routeList"></ul>
+
+            <div id="issueModal">
+              <div class="modal-content">
+                <h3>Report an Issue</h3>
+                <form id="issueForm">
+                  <input type="hidden" name="ajax_issue" value="1">
+                  <input type="hidden" name="route_id" id="modalRouteId">
+                  
+                  <label for="issueDescription">Description:</label>
+                  <textarea name="description" id="issueDescription" placeholder="Describe the issue..." required></textarea>
+                  
+                  <label for="issueDate">Date:</label>
+                  <input type="date" name="issue_date" id="issueDate" required>
+                  
+                  <label for="issueTime">Time:</label>
+                  <input type="time" name="issue_time" id="issueTime" required>
+                  
+                  <label for="issueLatLng">Location (Lat, Lng):</label>
+                  <input type="text" name="latlng" id="issueLatLng" required>
+                  
+                  <div class="button-group">
+                    <button type="submit">Save Issue</button>
+                    <button type="button" onclick="closeIssueModal()">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div id="toggleModal">
+              <div class="modal-content">
+                <h3>Change Route Status</h3>
+                <form id="toggleForm" method="post">
+                  <input type="hidden" name="toggle_id" id="toggleId">
+                  
+                  <label for="toggleDate">Date of Change:</label>
+                  <input type="date" name="status_date" id="toggleDate" required>
+                  
+                  <label for="toggleTime">Time of Change:</label>
+                  <input type="time" name="status_time" id="toggleTime" required>
+                  
+                  <div class="button-group">
+                    <button type="submit">Confirm</button>
+                    <button type="button" onclick="closeToggleModal()">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div><!--  end of Col-md-6 -->
+
+      </div>
+      <!--end LEFT PORTION -->
+
+      <!-- RIGHT PORTION -->
+      <div class="col-md-9 f-left">
+        <div id="map"></div>
+    
+      </div>
+      <!-- end RIGHT PORTION -->
+    </div>
+    
+
+    
+    
+
+  </section>
+
+  <script src="js/bootstrap.min.js"></script>
   <script src="leaflet/leaflet.js"></script>
+  
   <script>
     // --- Map Initialization ---
     const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1 });
@@ -382,9 +404,8 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const li = document.createElement("li");
         li.innerHTML = `${route.name} (${route.status}) 
           <form method="post" style="display:inline;" onsubmit="return confirmToggle(this, ${route.id})">
-            <button type="submit">Toggle Status</button>
-          </form>
-          <button type="button" onclick='openIssueModal(${route.id}, null)'>Report Issue on Route</button>`;
+            <button class="btn btn-warning" type="submit">Toggle Status</button>
+          </form>`;
         document.getElementById("routeList").appendChild(li);
 
       } catch(e) { console.error("Could not parse route data:", e, route); }
@@ -493,6 +514,7 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
       // Combine date and time and append to the original form before submitting
       const date = document.getElementById("toggleDate").value;
       const time = document.getElementById("toggleTime").value;
+      const id = document.getElementById("toggleId").value;
       if (!date || !time) {
           alert("Please select a valid date and time.");
           return;
@@ -507,6 +529,10 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
       let hiddenTime = document.createElement("input");
       hiddenTime.type = "hidden"; hiddenTime.name = "status_time"; hiddenTime.value = time;
       originalForm.appendChild(hiddenTime);
+
+      let hiddenId = document.createElement("input");
+      hiddenId.type = "hidden"; hiddenId.name = "toggle_id"; hiddenId.value = id;
+      originalForm.appendChild(hiddenId);
       
       originalForm.submit();
     });
@@ -517,5 +543,6 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     });
 
   </script>
+  
 </body>
 </html>
