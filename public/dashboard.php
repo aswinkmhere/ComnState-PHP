@@ -12,6 +12,10 @@ $db = new PDO('sqlite:../db/app.db');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $user = $_SESSION['user'];
 
+$stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
+$stmt->execute([$user]);
+$userId = $stmt->fetchColumn();
+
 // --- Schema Enforcement ---
 // 1. Create routes table
 $db->exec("CREATE TABLE IF NOT EXISTS routes (
@@ -42,7 +46,11 @@ $db->exec("CREATE TABLE IF NOT EXISTS issues (
 // Endpoint to fetch all reported issues for the map
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_issues'])) {
     header('Content-Type: application/json');
-    $stmt = $db->query("SELECT id, route_id, user, lat, lng, description, time_reported FROM issues");
+    //$stmt = $db->query("SELECT id, route_id, user, lat, lng, description, time_reported FROM issues");
+     $stmt = $db->prepare("SELECT id, route_id, user, lat, lng, description, time_reported 
+                          FROM issues WHERE user = ?");
+    $stmt->execute([$user]);
+
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     exit;
 }
@@ -168,10 +176,17 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
   </style>
 </head>
 <body>
+   <a href="#" class="ribbon">Dagger Website</a>
+  <a href="index.php" class="ribbon-cc">
+    Comn State
+  </a>
+  <a href="logout.php" class="ribbon-login">
+    Logout
+  </a>
   <section>
     <div class="col-md-12 f-left">
       <h2>Dashboard : <?php echo htmlspecialchars($user); ?></h2>
-      <a href="logout.php">Logout</a>
+      
     </div>
 
 
@@ -227,54 +242,14 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
 
           <div class="d-card">
+            <h3>Existing Routes</h3>
             <ul id="routeList"></ul>
 
-            <div id="issueModal">
-              <div class="modal-content">
-                <h3>Report an Issue</h3>
-                <form id="issueForm">
-                  <input type="hidden" name="ajax_issue" value="1">
-                  <input type="hidden" name="route_id" id="modalRouteId">
-                  
-                  <label for="issueDescription">Description:</label>
-                  <textarea name="description" id="issueDescription" placeholder="Describe the issue..." required></textarea>
-                  
-                  <label for="issueDate">Date:</label>
-                  <input type="date" name="issue_date" id="issueDate" required>
-                  
-                  <label for="issueTime">Time:</label>
-                  <input type="time" name="issue_time" id="issueTime" required>
-                  
-                  <label for="issueLatLng">Location (Lat, Lng):</label>
-                  <input type="text" name="latlng" id="issueLatLng" required>
-                  
-                  <div class="button-group">
-                    <button type="submit">Save Issue</button>
-                    <button type="button" onclick="closeIssueModal()">Cancel</button>
-                  </div>
-                </form>
-              </div>
-            </div>
+            
 
-            <div id="toggleModal">
-              <div class="modal-content">
-                <h3>Change Route Status</h3>
-                <form id="toggleForm" method="post">
-                  <input type="hidden" name="toggle_id" id="toggleId">
-                  
-                  <label for="toggleDate">Date of Change:</label>
-                  <input type="date" name="status_date" id="toggleDate" required>
-                  
-                  <label for="toggleTime">Time of Change:</label>
-                  <input type="time" name="status_time" id="toggleTime" required>
-                  
-                  <div class="button-group">
-                    <button type="submit">Confirm</button>
-                    <button type="button" onclick="closeToggleModal()">Cancel</button>
-                  </div>
-                </form>
-              </div>
-            </div>
+            
+
+            
           </div>
         </div><!--  end of Col-md-6 -->
 
@@ -286,6 +261,53 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div id="map"></div>
     
       </div>
+
+      <div id="issueModal">
+        <div class="modal-content">
+          <h3>Report an Issue</h3>
+          <form id="issueForm">
+            <input type="hidden" name="ajax_issue" value="1">
+            <input type="hidden" name="route_id" id="modalRouteId">
+            
+            <label for="issueDescription">Description:</label>
+            <textarea name="description" id="issueDescription" placeholder="Describe the issue..." required></textarea>
+            
+            <label for="issueDate">Date:</label>
+            <input type="date" name="issue_date" id="issueDate" required>
+            
+            <label for="issueTime">Time:</label>
+            <input type="time" name="issue_time" id="issueTime" required>
+            
+            <label for="issueLatLng">Location (Lat, Lng):</label>
+            <input type="text" name="latlng" id="issueLatLng" required>
+            
+            <div class="button-group">
+              <button class="btn btn-success" type="submit">Save Issue</button>
+              <button class="btn btn-secondary" type="button" onclick="closeIssueModal()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="toggleModal">
+        <div class="modal-content">
+          <h3>Change Route Status</h3>
+          <form id="toggleForm" method="post">
+            <input type="hidden" name="toggle_id" id="toggleId">
+            
+            <label for="toggleDate">Date of Change:</label>
+            <input type="date" name="status_date" id="toggleDate" required>
+            
+            <label for="toggleTime">Time of Change:</label>
+            <input type="time" name="status_time" id="toggleTime" required>
+            
+            <div class="button-group">
+              <button class="btn btn-success" type="submit">Confirm</button>
+              <button class="btn btn-alert" type="button" onclick="closeToggleModal()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
       <!-- end RIGHT PORTION -->
     </div>
     
@@ -295,7 +317,7 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
   </section>
 
-  <script src="js/bootstrap.min.js"></script>
+  
   <script src="leaflet/leaflet.js"></script>
   
   <script>
@@ -392,24 +414,43 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
           .bindPopup(`<b>Route:</b> ${route.name}<br><b>Status:</b> ${route.status}<br><b>Last Status Change:</b> ${route.last_status_time || "N/A"}`)
           .addTo(map);
 
-        // Add click listener to existing routes for reporting issues on them
+        // Add click listener to existing routes for reporting issues
         polyline.on('click', (e) => {
-            if (currentMode === 'issue') {
-                L.DomEvent.stopPropagation(e); // Prevent map click from firing
-                openIssueModal(route.id, e.latlng);
-            }
+          if (currentMode === 'issue') {
+            L.DomEvent.stopPropagation(e);
+            openIssueModal(route.id, e.latlng);
+          }
         });
 
-        // Add route to the list below the map
-        const li = document.createElement("li");
-        li.innerHTML = `${route.name} (${route.status}) 
-          <form method="post" style="display:inline;" onsubmit="return confirmToggle(this, ${route.id})">
-            <button class="btn btn-warning" type="submit">Toggle Status</button>
-          </form>`;
-        document.getElementById("routeList").appendChild(li);
+        // Add route status button neatly arranged
+        //const li = document.createElement("li");
 
-      } catch(e) { console.error("Could not parse route data:", e, route); }
+        // create a real FORM for each route (so later we can call form.submit())
+        const form = document.createElement("form");
+        form.method = "post";
+        form.style.display = "inline"; // keep inline
+        // optional: form.action = "/your-toggle-endpoint"; // set if needed
+
+        // visible button that opens the modal
+        const btn = document.createElement("button");
+        btn.type = "button"; // IMPORTANT: don't submit on click
+        btn.className = "btn";
+        btn.textContent = route.name;
+        btn.style.backgroundColor = (route.status === "functional") ? "#40c140" : "#eb1212";
+
+        // when clicked, open modal and pass the form reference
+        btn.addEventListener("click", (e) => confirmToggle(e, form, route.id));
+
+        form.appendChild(btn);
+        //li.appendChild(form);
+        document.getElementById("routeList").appendChild(form);
+
+
+      } catch(e) { 
+        console.error("Could not parse route data:", e, route); 
+      }
     });
+
 
     map.on('click', function(e) {
       const lat = e.latlng.lat.toFixed(4);
@@ -472,17 +513,22 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
       document.getElementById('issueModal').style.display = "none";
     }
 
-    function confirmToggle(form, routeId) {
-      event.preventDefault(); // Prevent direct form submission
+    
+    // confirmToggle: receives the click event, the form reference, and routeId
+    function confirmToggle(e, originalForm, routeId) {
+      e.preventDefault();                // stop default button behaviour
+      window._toggleFormRef = originalForm; // store the actual form <element>
+
+      // fill modal inputs (you also keep toggleId for convenience)
       document.getElementById('toggleId').value = routeId;
       const now = new Date();
       document.getElementById('toggleDate').value = now.toISOString().split('T')[0];
       document.getElementById('toggleTime').value = String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
+
       document.getElementById('toggleModal').style.display = "flex";
-      // Store reference to the original form to submit it later
-      window._toggleFormRef = form;
       return false;
     }
+
 
     function closeToggleModal() {
       document.getElementById('toggleModal').style.display = "none";
@@ -511,30 +557,39 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     document.getElementById("toggleForm").addEventListener("submit", function(e){
       e.preventDefault();
-      // Combine date and time and append to the original form before submitting
+
       const date = document.getElementById("toggleDate").value;
       const time = document.getElementById("toggleTime").value;
       const id = document.getElementById("toggleId").value;
-      if (!date || !time) {
-          alert("Please select a valid date and time.");
-          return;
-      }
-      
       const originalForm = window._toggleFormRef;
-      // Add hidden inputs for date and time to the original form
-      let hiddenDate = document.createElement("input");
+
+      if (!originalForm) {
+        alert("Original form not found. Please retry.");
+        return;
+      }
+      if (!date || !time) { alert("Please select date and time."); return; }
+
+      // remove duplicates if any
+      ['status_date','status_time','toggle_id'].forEach(name => {
+        const ex = originalForm.querySelector(`input[name="${name}"]`);
+        if (ex) ex.remove();
+      });
+
+      // append hidden inputs to the original form
+      const hiddenDate = document.createElement("input");
       hiddenDate.type = "hidden"; hiddenDate.name = "status_date"; hiddenDate.value = date;
-      originalForm.appendChild(hiddenDate);
-
-      let hiddenTime = document.createElement("input");
+      const hiddenTime = document.createElement("input");
       hiddenTime.type = "hidden"; hiddenTime.name = "status_time"; hiddenTime.value = time;
-      originalForm.appendChild(hiddenTime);
-
-      let hiddenId = document.createElement("input");
+      const hiddenId = document.createElement("input");
       hiddenId.type = "hidden"; hiddenId.name = "toggle_id"; hiddenId.value = id;
+
+      originalForm.appendChild(hiddenDate);
+      originalForm.appendChild(hiddenTime);
       originalForm.appendChild(hiddenId);
-      
-      originalForm.submit();
+
+      // close modal and submit the original form
+      closeToggleModal();
+      originalForm.submit(); // this will work because originalForm is a <form> element
     });
 
     // --- Initial Load ---
@@ -544,5 +599,6 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
   </script>
   
+  <script src="js/bootstrap.min.js"></script>
 </body>
 </html>

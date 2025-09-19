@@ -40,6 +40,11 @@
         background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
         color: #fff;
     }
+    .login-card{
+        width: 40%;
+        margin: auto;
+        margin-top: 25vh;
+    }
     .login-card,.d-card {
         background: rgba(255, 255, 255, 0.1); /* Slightly more transparent */
         backdrop-filter: blur(10px);
@@ -48,7 +53,7 @@
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    label{
+    .d-card label{
         position: relative;
         float: left!important;
         width: 48%!important;
@@ -68,8 +73,8 @@
         padding: 15px 20px;
         margin-bottom: 10px;
     }
-    .d-card h3 {
-        color: #fff;
+    .d-card h3,.filters h3 {
+        cursor: default;
         text-align: center;
         margin-bottom: 5px;
         font-weight: 300;
@@ -111,7 +116,7 @@
         color: #fff;
         border: none;
     }
-    #map { height: 600px; width: 100%; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2)}
+    #map { height: 600px; width: 100%; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background-color: #343157;}
     #routeList { margin-top: 20px; padding-left: 20px; }
     #routeList li { margin: 8px 0; }
     #issueModal, #toggleModal {
@@ -140,6 +145,41 @@
         background-color: #c82333;
     }
 
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed!important;
+        z-index: 9999; /* Always on top */
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto; /* Scroll if needed */
+        background-color: rgba(0,0,0,0.6); /* Dark semi-transparent backdrop */
+    }
+
+    .modal-content {
+        background-color: #fff;
+        margin: 10% auto; /* Center vertically & horizontally */
+        padding: 20px;
+        border-radius: 10px;
+        width: 400px; /* Adjust size */
+        box-shadow: 0 0 15px rgba(0,0,0,0.3);
+        text-align: center;
+        color: #000;
+    }
+
+    .modal-content label{
+        text-align: left;
+    }
+
+    .close {
+        float: right;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+
 
     .f-left{
       position: relative;
@@ -149,4 +189,126 @@
     .btn-container .btn{
         font-size: 0.8rem;
         margin-bottom: 5px;
+    }
+
+    #routeList button{
+        margin: 5px;
+    }
+    #routeList button:hover{
+        color: #fff!important;
+    }
+    .logout-img{
+        display: inline-block;
+        width: 25px;
+    }
+    .t-total{
+        border: 2px solid #fff;
+        font-weight: bold;
+    }
+    .t-func{
+        border: 2px solid #4eeb70;
+        color : #4eeb70;
+        font-weight: bold;
+    }
+    .t-defunc{
+        border: 2px solid #d04f4f;
+        color: #d04f4f;
+        font-weight: bold;
+    }
+    .t-total h3, .t-func h3, .t-defunc h3{
+        font-weight: bold;
+    }
+    .tiles-tooltip {
+        position: absolute;
+        top:0;
+        background: #333;
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 13px;
+        display: none;
+        pointer-events: none; /* prevents tooltip from interfering with mouseleave */
+        z-index: 9999;
+        transition: all ease-in 0.3s;
+    }
+    .filter-link{
+        background: rgba(255, 255, 255, 0.1); /* Slightly more transparent */
+        backdrop-filter: blur(10px);
+        border-radius: 3px;
+        padding: 1px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin : 2px 0px;
+        color: #fff;
+        display: block;
+        text-decoration: none;
+        text-align: center;
+    }
+    .filters a:hover, .filters a.active,.filters-eqpt a:hover, .filters-eqpt a.active { background-color: #e9ecef; color: #0f0c29; }
+    
+    .filters{ width: 150px; border-right: 1px solid #333; padding-right: 20px; overflow-y: auto; height: 90vh;}
+
+    .filters-eqpt { width: 200px; border-left: 1px solid #333; padding-left: 20px; padding-right: 10px;  overflow-y: auto; height: 90vh;}
+
+    
+    .ribbon,.ribbon-cc,.ribbon-login {
+      position: absolute;
+      margin-top: 20px;
+      z-index: 9999;
+
+      background: #020024;
+        background: linear-gradient(90deg,rgba(180, 58, 101, 1) 0%, rgba(253, 29, 29, 1) 50%, rgba(252, 176, 69, 1) 100%);
+      padding: 25px 15px;
+      height: 70px;
+      top: -20px;
+      left: 40%;
+      line-height:30px;
+      width: 280px;
+      color: white;
+      font-size: 20px;
+      text-align: center;
+      font-weight: bold;
+      margin: auto;
+      text-decoration: none!important;
+      border-radius: 8px 8px 0 0;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.7), 0 0 40px rgba(0, 255, 255, 0.5);
+      clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+      transition: all 0.3s ease;
+    }
+
+    .ribbon-cc {
+        left: 20%;
+         background: linear-gradient(90deg,rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 35%, rgba(0, 212, 255, 1) 100%);
+    }
+    .ribbon-login{
+        left: 60%;
+        width: 150px;
+         background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+    }
+    .ribbon:hover,.ribbon-cc:hover,.ribbon-login:hover {
+      background: linear-gradient(90deg,rgba(180, 58, 101, 1) 0%, rgba(253, 29, 29, 1) 15%, rgba(252, 176, 69, 1) 100%);
+      transform: translateY(5px) scale(1.05);
+      box-shadow: 0 0 25px rgba(0, 255, 255, 0.9), 0 0 50px rgba(0, 255, 255, 0.6);
+      color: #fff;
+       text-decoration: none!important;
+    }
+
+    .ribbon-cc:hover{
+         background: linear-gradient(90deg,rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 30%, rgba(0, 212, 255, 1) 100%);
+    }
+    .ribbon-login:hover{
+        background: linear-gradient(90deg, #4b6cb7 0%, #182848 70%, #182848 100%);
+    }
+    /* Small hanging strip */
+    .ribbon::after,.ribbon-cc::after,.ribbon-login::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 40px;
+      color: #dddddd;
+      background: linear-gradient(to bottom, #00f2fe, #4facfe);
+      box-shadow: 0 0 10px rgba(129, 6, 45, 0.6);
     }
