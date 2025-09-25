@@ -14,7 +14,10 @@ $user = $_SESSION['user'];
 
 $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
 $stmt->execute([$user]);
+
+
 $userId = $stmt->fetchColumn();
+
 
 // --- Schema Enforcement ---
 // 1. Create routes table
@@ -163,6 +166,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_id'])) {
 $stmt = $db->prepare("SELECT * FROM routes WHERE user_id = ?");
 $stmt->execute([$user]);
 $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmt = $db->query("SELECT id, name, latitude, longitude FROM nodes");
+$nodes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+$stmt = $db->query("SELECT id, name, latitude, longitude FROM places");
+$places = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
 ?>
 <!DOCTYPE html>
 <html>
@@ -322,22 +334,68 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
   
   <script>
     // --- Map Initialization ---
-    const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1 });
-    const bounds = [[0,0], [908,1630]];
-    L.imageOverlay("images/map.jpg", bounds).addTo(map);
+    const map = L.map('map', { crs: L.CRS.Simple, minZoom: -2.5 });
+    const bounds = [[0,0], [3904,8192]];
+    L.imageOverlay("images/baramulla.jpg", bounds).addTo(map);
     map.fitBounds(bounds);
-
+    let placeMarkers = {}; 
+    const places = <?php echo json_encode($places); ?>;
     // --- State Variables ---
     let currentMode = "draw";
     let drawnLine = null;
     let drawnPoints = [];
     const userRoutes = <?php echo json_encode($routes); ?>;
     const issueMarkers = {}; // Store L.Marker objects keyed by issue.id for easy removal
+    let nodeMarkers = {};  // add this for nodes
+    const nodes = <?php echo json_encode($nodes); ?>;
 
     // --- Core Functions ---
     function setMode(mode) {
       currentMode = mode;
       document.getElementById('modeIndicator').innerText = `Current Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+    }
+
+    
+    function addPlaceMarkerToMap(node, iconUrl, shadowUrl) {
+        if (!node || node.latitude === null || node.longitude === null || !node.id || typeof node.latitude === 'undefined' ) {
+            //console.error("Invalid node object for marker:", node);
+            return;
+        }
+
+        // Remove old marker if it already exists
+        if (placeMarkers[node.id]) {
+            map.removeLayer(placeMarkers[node.id]);
+        }
+
+        const markerIcon = L.icon({
+            iconUrl: 'images/map-icons/location-pin.png',
+            shadowUrl: shadowUrl || '',
+            iconSize: [20, 28],    // adjust based on balloon image
+            iconAnchor: [16, 48],  // bottom center of the balloon points to location
+            popupAnchor: [0, -48]  // popup above the balloon
+        });
+        
+
+        //const marker = L.marker([node.latitude, node.longitude], { icon: markerIcon }).addTo(map);
+
+        const marker = L.marker([node.latitude, node.longitude], { icon: markerIcon })
+            .bindTooltip(node.name, { permanent: true, direction: 'right', offset: [-10, -10] })
+            .addTo(map);
+
+        marker.bindPopup(`
+            <b>Place:</b> ${node.name}
+        `);
+
+        placeMarkers[node.id] = marker;
+    }
+
+    function loadAllPlaces() {
+        places.forEach(place => {
+            addPlaceMarkerToMap(
+                place,
+                "../images/map-icons/location-pin.png"  // your custom balloon icon
+            );
+        });
     }
 
     // --- Issue Handling ---
@@ -362,6 +420,40 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         issueMarkers[issue.id] = marker; // Store the marker
     }
 
+    function addNodeMarkerToMap(node, iconUrl, shadowUrl) {
+        if (!node || node.latitude === null || node.longitude === null || !node.id || typeof node.latitude === 'undefined' ) {
+            //console.error("Invalid node object for marker:", node);
+            return;
+        }
+
+        // Remove old marker if it already exists
+        if (nodeMarkers[node.id]) {
+            map.removeLayer(nodeMarkers[node.id]);
+        }
+
+        const markerIcon = L.icon({
+            iconUrl: 'images/map-icons/marker-icon.png',
+            shadowUrl: shadowUrl || '',
+            iconSize: [25, 36],    // adjust based on balloon image
+            iconAnchor: [16, 48],  // bottom center of the balloon points to location
+            popupAnchor: [0, -48]  // popup above the balloon
+        });
+        
+
+        //const marker = L.marker([node.latitude, node.longitude], { icon: markerIcon }).addTo(map);
+
+        const marker = L.marker([node.latitude, node.longitude], { icon: markerIcon })
+            .bindTooltip(node.name, { permanent: true, direction: 'right', offset: [-5, -5] })
+            .addTo(map);
+
+        marker.bindPopup(`
+            <b>Node:</b> ${node.name}<br>
+            <b>ID:</b> ${node.id}
+        `);
+
+        nodeMarkers[node.id] = marker;
+    }
+
     function loadAllIssues() {
         fetch("dashboard.php?get_issues=1")
             .then(response => response.json())
@@ -370,6 +462,22 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
             })
             .catch(error => console.error("Failed to load issues:", error));
     }
+
+    function loadAllNodes() {
+        // fetch("comn_state.php?get_nodes=1") // <-- your PHP should return nodes as JSON
+        //     .then(response => response.json())
+        //     .then(nodes => {
+     
+                nodes.forEach(node => {
+                    addNodeMarkerToMap(
+                        node,
+                        "../images/map-icons/marker-icon.png"  // your custom balloon icon
+                    );
+                });
+            // })
+            // .catch(error => console.error("Failed to load nodes:", error));
+    }
+
 
     async function deleteIssue(issueId) {
         if (!confirm("Are you sure you want to delete this issue?")) {
@@ -407,11 +515,11 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     userRoutes.forEach((route) => {
       try {
         const coords = JSON.parse(route.coordinates);
-        const color = (route.status === "functional") ? "green" : "red";
+        const color = (route.status === "functional") ? "#f801b2ff" : "red";
         const weight = (route.type === "double") ? 6 : 3;
         
         const polyline = L.polyline(coords, { color: color, weight: weight })
-          .bindPopup(`<b>Route:</b> ${route.name}<br><b>Status:</b> ${route.status}<br><b>Last Status Change:</b> ${route.last_status_time || "N/A"}`)
+          .bindPopup(`<b>Route:</b> ${route.name}<br><b>Status:</b> ${route.status}<br><b>Last Status Change:</b> ${route.last_status_time || "N/A"}<br><button class="btn btn-danger btn-tooltip" onclick="confirmToggle(null, ${route.id})">Toggle</button>`)
           .addTo(map);
 
         // Add click listener to existing routes for reporting issues
@@ -436,10 +544,10 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         btn.type = "button"; // IMPORTANT: don't submit on click
         btn.className = "btn";
         btn.textContent = route.name;
-        btn.style.backgroundColor = (route.status === "functional") ? "#40c140" : "#eb1212";
+        btn.style.backgroundColor = (route.status === "functional") ? "#f801b2ff" : "#eb1212";
 
         // when clicked, open modal and pass the form reference
-        btn.addEventListener("click", (e) => confirmToggle(e, form, route.id));
+        btn.addEventListener("click", (e) => confirmToggle(e, route.id));
 
         form.appendChild(btn);
         //li.appendChild(form);
@@ -515,9 +623,10 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     
     // confirmToggle: receives the click event, the form reference, and routeId
-    function confirmToggle(e, originalForm, routeId) {
-      e.preventDefault();                // stop default button behaviour
-      window._toggleFormRef = originalForm; // store the actual form <element>
+    function confirmToggle(e, routeId) {
+      if(e!=null)
+        e.preventDefault();                // stop default button behaviour
+      window._toggleFormRef = document.getElementById('toggleForm'); // store the actual form <element>
 
       // fill modal inputs (you also keep toggleId for convenience)
       document.getElementById('toggleId').value = routeId;
@@ -595,6 +704,8 @@ $routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     // --- Initial Load ---
     document.addEventListener('DOMContentLoaded', (event) => {
         loadAllIssues();
+        loadAllNodes();
+      loadAllPlaces();
     });
 
   </script>

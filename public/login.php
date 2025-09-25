@@ -13,7 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
   if ($user) {
-    $_SESSION['user'] = $user['username'];
+     $_SESSION['user'] = $user['username'];
+    if($user['isAdmin'] == 1){
+       $_SESSION['isAdmin'] = 1;
+       header("Location: admin_map.php");
+       exit;
+    }
     header("Location: dashboard.php");
     exit;
   } else {

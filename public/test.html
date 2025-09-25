@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raster Map with Markers</title>
+
+    <link rel="stylesheet" href="leaflet/leaflet.css"/>
+    <link rel="stylesheet" href="css/style.css"/>
+     <link rel="stylesheet" href="css/bootstrap.min.css"/>
+
+    <script src="js/jquery-3.7.1.min.js"></script>
+     <script src="js/bootstrap.min.js"></script>
+    <script src="leaflet/leaflet.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; background-color: #333; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script>
+        $(document).ready(function() {
+            // --- 1. Define Map and Image Properties ---
+            const IMG_WIDTH = 8192;
+            const IMG_HEIGHT = 3904;
+            const imageUrl = 'images/baramulla.jpg'; // <-- IMPORTANT: Change to your image file name
+
+            const latMin = 33.855;
+            const latMax = 34.4023;
+            const longMin = 73.8207;
+            const longMax = 75.0611;
+
+            // --- 2. Initialize Leaflet Map ---
+            // We use L.CRS.Simple as we are not using a geographic map.
+            // Our coordinates are simple [y, x] pixel values.
+            const map = L.map('map', {
+                crs: L.CRS.Simple,
+                minZoom: -2.5, // Allow zooming out
+            });
+
+            // Define the image bounds in pixel coordinates.
+            // The format is [[yMin, xMin], [yMax, xMax]]
+            const bounds = [[975, 0], [IMG_HEIGHT, IMG_WIDTH]];
+
+            // Add the raster image as an overlay
+            L.imageOverlay(imageUrl, bounds).addTo(map);
+
+            // Fit the map view to the image bounds
+            map.fitBounds(bounds);
+
+
+            // --- 3. The Coordinate Conversion Function ---
+            /**
+             * Converts geographic coordinates (Latitude, Longitude) to pixel coordinates (Y, X).
+             * @param {number} lat The latitude of the point.
+             * @param {number} lng The longitude of the point.
+             * @returns {L.LatLng} A Leaflet LatLng object with [y, x] coordinates for the map.
+             */
+            function geoToPixel(lat, lng) {
+                // Calculate the fractional position of the longitude within its range
+                let xFraction = (lng - longMin) / (longMax - longMin);
+                
+                // Calculate the fractional position of the latitude within its range
+                let yFraction = (lat - latMin) / (latMax - latMin);
+
+                // Convert the fractional positions to pixel coordinates
+                let x = xFraction * IMG_WIDTH;
+                
+                // IMPORTANT: The Y-axis for images starts from the TOP (0), while latitude
+                // starts from the BOTTOM. We must invert the Y-coordinate.
+                let y = (1 - yFraction) * IMG_HEIGHT;
+
+                return L.latLng(y, x);
+            }
+
+
+            // --- 4. Fetch Data and Plot Markers ---
+            $.ajax({
+                url: 'fetch_nodes.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(nodes) {
+                    if (nodes.error) {
+                        console.error("Error from server:", nodes.error);
+                        alert("Could not load data from the server. Check console for details.");
+                        return;
+                    }
+                    
+                    nodes.forEach(function(node) {
+                        // Get the pixel coordinates for the current node
+                        let pixelCoords = geoToPixel(node.latitude, node.longitude);
+                        
+                        // Create a marker and add a popup with the node's name
+                        L.marker(pixelCoords)
+                            .addTo(map)
+                            .bindPopup(`<b>ID:</b> ${node.id}<br><b>Name:</b> ${node.name}`);
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                    alert("Failed to fetch node data. Is the PHP server running?");
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
